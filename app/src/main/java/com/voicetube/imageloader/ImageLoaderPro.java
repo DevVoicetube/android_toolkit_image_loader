@@ -3,37 +3,6 @@ package com.voicetube.imageloader;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Bitmap;
-import android.os.Build;
-import android.renderscript.Allocation;
-import android.renderscript.Element;
-import android.renderscript.RenderScript;
-import android.renderscript.ScriptIntrinsicBlur;
-import android.support.annotation.IntRange;
-import android.util.Log;
-import android.view.View;
-import android.widget.ImageView;
-
-import com.nostra13.universalimageloader.core.DisplayImageOptions;
-import com.nostra13.universalimageloader.core.ImageLoader;
-import com.nostra13.universalimageloader.core.ImageLoaderConfiguration;
-import com.nostra13.universalimageloader.core.assist.FailReason;
-import com.nostra13.universalimageloader.core.assist.ImageScaleType;
-import com.nostra13.universalimageloader.core.display.FadeInBitmapDisplayer;
-import com.nostra13.universalimageloader.core.display.SimpleBitmapDisplayer;
-import com.nostra13.universalimageloader.core.listener.SimpleImageLoadingListener;
-import com.nostra13.universalimageloader.utils.L;
-
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
-
-/**
- * Created by tony1 on 12/30/2016.
- */
-
-import android.annotation.SuppressLint;
-import android.content.Context;
-import android.graphics.Bitmap;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Build;
@@ -62,6 +31,10 @@ import java.io.File;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+
+/**
+ * Created by tony1 on 12/30/2016.
+ */
 
 /**
  * Created by tony1 on 12/30/2016.
@@ -173,15 +146,19 @@ public class ImageLoaderPro {
             IMAGE_LOADER.displayImage(imageUri, iv, imageLoaderProListener);
             return;
         }
+        File fileCache = IMAGE_LOADER.getDiskCache().get(imageUri);
         boolean hasNetwork = isNetworkAvailable();
         boolean isFile = imageUri.indexOf("file://") == 0;
         boolean isDrawable = imageUri.indexOf("drawable://") == 0;
         boolean isAssets = imageUri.indexOf("assets://") == 0;
+        boolean hasFileCache=isExist(fileCache);
         if (hasNetwork && !isFile && !isDrawable && !isAssets) {
-            File fileCache = IMAGE_LOADER.getDiskCache().get(imageUri);
-            if (isExist(fileCache)) {
+            if (hasFileCache) {
                 if (isFileExpired(fileCache, cacheExpiredDuration)) {
                     DiskCacheUtils.removeFromCache(imageUri,IMAGE_LOADER.getDiskCache());
+                }else{
+                    load(iv, getFileUri(fileCache.getAbsolutePath()), defaultUri, cacheExpiredDuration, enableBlur, blurFactor, enableFade, fadeDuration, imageLoaderProListener);
+                    return;
                 }
             }
         }
