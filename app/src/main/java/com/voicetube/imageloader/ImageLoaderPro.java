@@ -28,11 +28,14 @@ import com.nostra13.universalimageloader.utils.L;
 import com.nostra13.universalimageloader.utils.MemoryCacheUtils;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
 /**
+ * Created by tony1 on 12/30/2016.
+ * <p>
  * Created by tony1 on 12/30/2016.
  */
 
@@ -95,26 +98,26 @@ public class ImageLoaderPro {
         return PATH_FILE + filePath;
     }
 
-    public static final void deleteDiskCache(String imageUri){
-        if(IMAGE_LOADER==null){
+    public static final void deleteDiskCache(String imageUri) {
+        if (IMAGE_LOADER == null) {
             return;
         }
-        DiskCacheUtils.removeFromCache(imageUri,IMAGE_LOADER.getDiskCache());
+        DiskCacheUtils.removeFromCache(imageUri, IMAGE_LOADER.getDiskCache());
     }
 
-    public static final void deleteMemoryCache(String imageUri){
-        if(IMAGE_LOADER==null){
+    public static final void deleteMemoryCache(String imageUri) {
+        if (IMAGE_LOADER == null) {
             return;
         }
         MemoryCacheUtils.removeFromCache(imageUri, IMAGE_LOADER.getMemoryCache());
     }
 
-    public static final void deleteCache(String imageUri){
-        if(IMAGE_LOADER==null){
+    public static final void deleteCache(String imageUri) {
+        if (IMAGE_LOADER == null) {
             return;
         }
         MemoryCacheUtils.removeFromCache(imageUri, IMAGE_LOADER.getMemoryCache());
-        DiskCacheUtils.removeFromCache(imageUri,IMAGE_LOADER.getDiskCache());
+        DiskCacheUtils.removeFromCache(imageUri, IMAGE_LOADER.getDiskCache());
     }
 
     public static void load(ImageView iv, String imageUri) {
@@ -146,17 +149,17 @@ public class ImageLoaderPro {
             IMAGE_LOADER.displayImage(imageUri, iv, imageLoaderProListener);
             return;
         }
-        File fileCache = IMAGE_LOADER.getDiskCache().get(imageUri);
+        File fileCache = IMAGE_LOADER.getDiskCache().get(enableBlur?getBlurUri(imageUri,blurFactor):imageUri);
         boolean hasNetwork = isNetworkAvailable();
         boolean isFile = imageUri.indexOf("file://") == 0;
         boolean isDrawable = imageUri.indexOf("drawable://") == 0;
         boolean isAssets = imageUri.indexOf("assets://") == 0;
-        boolean hasFileCache=isExist(fileCache);
+        boolean hasFileCache = isExist(fileCache);
         if (hasNetwork && !isFile && !isDrawable && !isAssets) {
             if (hasFileCache) {
                 if (isFileExpired(fileCache, cacheExpiredDuration)) {
-                    DiskCacheUtils.removeFromCache(imageUri,IMAGE_LOADER.getDiskCache());
-                }else{
+                    DiskCacheUtils.removeFromCache(imageUri, IMAGE_LOADER.getDiskCache());
+                } else {
                     load(iv, getFileUri(fileCache.getAbsolutePath()), defaultUri, cacheExpiredDuration, enableBlur, blurFactor, enableFade, fadeDuration, imageLoaderProListener);
                     return;
                 }
@@ -283,8 +286,8 @@ public class ImageLoaderPro {
             this.blurFactor = blurFactor;
             this.enableFade = enableFade;
             this.fadeDuration = fadeDuration;
-            if(fadeDuration!=0){
-                this.enableFade=true;
+            if (fadeDuration != 0) {
+                this.enableFade = true;
             }
         }
 
@@ -300,7 +303,15 @@ public class ImageLoaderPro {
 
             //process blur
             if (enableBlur && blurFactor != 0) {
-                ((ImageView) view).setImageBitmap(Blur.fastblur(context, bitmap, blurFactor));
+                Bitmap bm = Blur.fastblur(context, bitmap, blurFactor);
+                //write cache
+                try {
+                    IMAGE_LOADER.getMemoryCache().put(getBlurUri(imageUri, blurFactor), bm);
+                    IMAGE_LOADER.getDiskCache().save(getBlurUri(imageUri, blurFactor), bm);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                ((ImageView) view).setImageBitmap(bm);
             }
             //process fade
             if (enableFade) {
@@ -352,17 +363,17 @@ public class ImageLoaderPro {
         }
 
         public Options setCacheExpiredSeconds(long seconds) {
-            this.cacheExpiredMillisecond = seconds*1000l;
+            this.cacheExpiredMillisecond = seconds * 1000l;
             return this;
         }
 
         public Options setCacheExpiredMins(long mins) {
-            this.cacheExpiredMillisecond = mins*60000l;
+            this.cacheExpiredMillisecond = mins * 60000l;
             return this;
         }
 
         public Options setCacheExpiredDays(long days) {
-            this.cacheExpiredMillisecond = days*86400000l;
+            this.cacheExpiredMillisecond = days * 86400000l;
             return this;
         }
 
@@ -372,7 +383,7 @@ public class ImageLoaderPro {
         }
 
         public Options setCacheExpiredWeeks(long weeks) {
-            this.cacheExpiredMillisecond = weeks*604800000l;
+            this.cacheExpiredMillisecond = weeks * 604800000l;
             return this;
         }
 
@@ -413,6 +424,10 @@ public class ImageLoaderPro {
         public int getFadeDuration() {
             return fadeDuration;
         }
+    }
+
+    private static String getBlurUri(String uri, int blurFactor) {
+        return uri + String.format("blur%d", blurFactor);
     }
 
     public static class Blur {
