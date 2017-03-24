@@ -75,7 +75,7 @@ public class ImageLoaderPro {
                 .considerExifParams(true)
                 .displayer(new SimpleBitmapDisplayer())
                 .build();
-        if (!BuildConfig.DEBUG) {
+        if (!com.nostra13.universalimageloader.BuildConfig.DEBUG) {
             L.writeLogs(false);
         }
         ImageLoaderConfiguration config = new ImageLoaderConfiguration.Builder(context).defaultDisplayImageOptions(DISPLAY_IMAGE_OPTIONS).build();
@@ -149,12 +149,30 @@ public class ImageLoaderPro {
             IMAGE_LOADER.displayImage(imageUri, iv, imageLoaderProListener);
             return;
         }
-        File fileCache = IMAGE_LOADER.getDiskCache().get(enableBlur?getBlurUri(imageUri,blurFactor):imageUri);
+        File fileCache = IMAGE_LOADER.getDiskCache().get(enableBlur ? getBlurUri(imageUri, blurFactor) : imageUri);
         boolean hasNetwork = isNetworkAvailable();
         boolean isFile = imageUri.indexOf("file://") == 0;
         boolean isDrawable = imageUri.indexOf("drawable://") == 0;
         boolean isAssets = imageUri.indexOf("assets://") == 0;
         boolean hasFileCache = isExist(fileCache);
+
+        //process blur
+        if(enableBlur){
+            Bitmap blurMemoryCache = blurMemoryCache(imageUri,enableBlur,blurFactor);
+            if(blurMemoryCache!=null){
+                iv.setImageBitmap(blurMemoryCache);
+                if(enableFade){
+                    FadeInBitmapDisplayer.animate(iv, fadeDuration);
+                }
+                return;
+            }
+            if(enableBlur && fileCache!=null && !isFileExpired(fileCache, cacheExpiredDuration)){
+                load(iv, getFileUri(fileCache.getAbsolutePath()),defaultUri,cacheExpiredDuration,false,0,enableFade,fadeDuration,null);
+                return;
+            }
+        }
+
+        //normal
         if (hasNetwork && !isFile && !isDrawable && !isAssets) {
             if (hasFileCache) {
                 if (isFileExpired(fileCache, cacheExpiredDuration)) {
@@ -304,14 +322,19 @@ public class ImageLoaderPro {
             //process blur
             if (enableBlur && blurFactor != 0) {
                 Bitmap bm = Blur.fastblur(context, bitmap, blurFactor);
+                ((ImageView) view).setImageBitmap(bm);
+
+                IMAGE_LOADER.getMemoryCache().put(getBlurUri(imageUri, blurFactor), bm);
                 //write cache
                 try {
-                    IMAGE_LOADER.getMemoryCache().put(getBlurUri(imageUri, blurFactor), bm);
-                    IMAGE_LOADER.getDiskCache().save(getBlurUri(imageUri, blurFactor), bm);
+                    Bitmap newBmp = Bitmap.createBitmap(bm);
+                    IMAGE_LOADER.getDiskCache().save(getBlurUri(imageUri, blurFactor), newBmp);
+                    newBmp.recycle();
+                    newBmp=null;
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-                ((ImageView) view).setImageBitmap(bm);
+
             }
             //process fade
             if (enableFade) {
@@ -428,6 +451,20 @@ public class ImageLoaderPro {
 
     private static String getBlurUri(String uri, int blurFactor) {
         return uri + String.format("blur%d", blurFactor);
+    }
+
+    private static Bitmap blurMemoryCache(String imageUri, boolean enableBlur, int blurFactor) {
+        if (!enableBlur) {
+            return null;
+        }
+        if (
+                IMAGE_LOADER.getMemoryCache().get(getBlurUri(imageUri, blurFactor)) != null
+                        && !IMAGE_LOADER.getMemoryCache().get(getBlurUri(imageUri, blurFactor)).isRecycled()
+                ) {
+            return IMAGE_LOADER.getMemoryCache().get(getBlurUri(imageUri, blurFactor));
+        } else {
+            return null;
+        }
     }
 
     public static class Blur {
